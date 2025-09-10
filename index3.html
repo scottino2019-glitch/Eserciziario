@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Annotator Vettoriale - Undo Funziona</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body {margin:0; font-family:sans-serif; background:#f0f4f8; display:flex; flex-direction:column; height:100vh;}
+.controls {display:flex; flex-wrap:wrap; gap:5px; justify-content:center; padding:5px; background:#ffffff; z-index:100;}
+button, input[type=color], input[type=range]{padding:5px 10px; border-radius:5px; border:none; font-size:14px;}
+#pdfContainer {position:relative; flex:1; overflow:auto; background:#e2e8f0; display:flex; justify-content:center; align-items:flex-start;}
+.pdf-canvas {border-radius:8px; display:block;}
+.annotation-canvas {position:absolute; left:0; top:0; touch-action:none;}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <input type="file" id="pdfFile" accept=".pdf">
+  <button id="prevPage">← Prec</button>
+  <span id="currentPage">1</span>/<span id="totalPages">1</span>
+  <button id="nextPage">Succ →</button>
+  <button id="zoomOut">🔍-</button>
+  <span id="zoomLevel">100%</span>
+  <button id="zoomIn">🔍+</button>
+  <button id="fitWidth">📐 Fit</button>
+  <button id="drawToggle">✏️ Disegna</button>
+  <input type="color" id="penColor" value="#ff0000">
+  <input type="range" id="penWidth" min="1" max="10" value="2">
+  <button id="clearAnnotations">🗑️ Cancella Tutte</button>
+  <button id="undoAnnotation">↶ Annulla Ultima</button>
+  <button id="saveAnnotations">💾 Salva</button>
+  <button id="loadAnnotations">📂 Carica</button>
+  <button id="closePDF">❌ Chiudi PDF</button>
+</div>
+
+<div id="pdfContainer">
+  <p class="text-gray-500">Carica un PDF per iniziare</p>
+</div>
+
+<script>
+class PDFAnnotator {
+  constructor(){
+    this.pdfDoc=null;
+    this.currentPage=1;
+    this.totalPages=0;
+    this.scale=1.2;
+    this.annotations={}; // {pageNum:[{points:[{x,y}], color, width}]}
+    this.drawingEnabled=false;
+    this.isDrawing=false;
+    this.penColor='#ff0000';
+    this.penWidth=2;
+    this.currentStroke=null;
+    this.init();
+  }
+
+  init(){
+    document.getElementById('pdfFile').addEventListener('change', e=>this.loadPDF(e));
+    document.getElementById('prevPage').addEventListener('click', ()=>this.prevPage());
+    document.getElementById('nextPage').addEventListener('click', ()=>this.nextPage());
+    document.getElementById('zoomIn').addEventListener('click', ()=>this.zoomIn());
+    document.getElementById('zoomOut').addEventListener('click', ()=>this.zoomOut());
+    document.getElementById('fitWidth').addEventListener('click', ()=>this.fitWidth());
+    document.getElementById('clearAnnotations').addEventListener('click', ()=>this.clearAnnotations());
+    document.getElementById('undoAnnotation').addEventListener('click', ()=>this.undoAnnotation());
+    document.getElementById('saveAnnotations').addEventListener('click', ()=>this.saveAnnotations());
+    document.getElementById('loadAnnotations').addEventListener('click', ()=>this.loadAnnotations());
+    document.getElementById('closePDF').addEventListener('click', ()=>this.closePDF());
+    document.getElementById('drawToggle').addEventListener('click', ()=>this.toggleDraw());
+    document.getElementById('penColor').addEventListener('change', e=>this.penColor=e.target.value);
+    document.getElementById('penWidth').addEventListener('change', e=>this.penWidth=parseInt(e.target.value));
+  }
+
+  async loadPDF(event){
+    const file=event.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=async e=>{
+      const typedArray=new Uint8Array(e.target.result);
+      this.pdfDoc=await pdfjsLib.getDocument(typedArray).promise;
+      this.totalPages=this.pdfDoc.numPages;
+      document.getElementById('totalPages').textContent=this.totalPages;
+      this.currentPage=1;
+      this.renderPage(this.currentPage);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  async renderPage(num){
+    if(!this.pdfDoc) return;
+    this.currentPage=num;
+
+    const page=await this.pdfDoc.getPage(num);
+    const viewport=page.getViewport({scale:this.scale});
+    const container=document.getElementById('pdfContainer');
+    container.innerHTML='';
+
+    const canvas=document.createElement('canvas');
+    canvas.width=viewport.width;
+    canvas.height=viewport.height;
+    canvas.className='pdf-canvas';
+    const ctx=canvas.getContext('2d');
+    await page.render({canvasContext:ctx, viewport}).promise;
+    container.appendChild(canvas);
+
+    const aCanvas=document.createElement('canvas');
+    aCanvas.width=viewport.width;
+    aCanvas.height=viewport.height;
+    aCanvas.className='annotation-canvas';
+    container.appendChild(aCanvas);
+    this.annotationCanvas=aCanvas;
+    this.annotationCtx=aCanvas.getContext('2d');
+
+    this.loadPageAnnotations();
+    this.setupDrawing();
+
+    document.getElementById('currentPage').textContent=num;
+    document.getElementById('zoomLevel').textContent=Math.round(this.scale*100)+'%';
+  }
+
+  setupDrawing(){
+    const aCanvas=this.annotationCanvas;
+    aCanvas.style.pointerEvents=this.drawingEnabled?'auto':'none';
+
+    aCanvas.onpointerdown=e=>{
+      if(!this.drawingEnabled) return;
+      this.isDrawing=true;
+      const rect=aCanvas.getBoundingClientRect();
+      const x=(e.clientX-rect.left)/aCanvas.width;
+      const y=(e.clientY-rect.top)/aCanvas.height;
+      this.currentStroke={points:[{x,y}], color:this.penColor, width:this.penWidth};
+    };
+
+    aCanvas.onpointermove=e=>{
+      if(!this.isDrawing || !this.currentStroke) return;
+      const rect=aCanvas.getBoundingClientRect();
+      const x=(e.clientX-rect.left)/aCanvas.width;
+      const y=(e.clientY-rect.top)/aCanvas.height;
+      const points=this.currentStroke.points;
+      const last=points[points.length-1];
+
+      this.annotationCtx.strokeStyle=this.currentStroke.color;
+      this.annotationCtx.lineWidth=this.currentStroke.width;
+      this.annotationCtx.lineCap='round';
+      this.annotationCtx.beginPath();
+      this.annotationCtx.moveTo(last.x*this.annotationCanvas.width,last.y*this.annotationCanvas.height);
+      this.annotationCtx.lineTo(x*this.annotationCanvas.width,y*this.annotationCanvas.height);
+      this.annotationCtx.stroke();
+
+      points.push({x,y});
+    };
+
+    aCanvas.onpointerup=e=>{
+      if(!this.isDrawing || !this.currentStroke) return;
+      if(!this.annotations[this.currentPage]) this.annotations[this.currentPage]=[];
+      this.annotations[this.currentPage].push(this.currentStroke);
+      this.currentStroke=null;
+      this.isDrawing=false;
+    };
+
+    aCanvas.onpointerleave=e=>{
+      if(this.isDrawing && this.currentStroke){
+        if(!this.annotations[this.currentPage]) this.annotations[this.currentPage]=[];
+        this.annotations[this.currentPage].push(this.currentStroke);
+      }
+      this.currentStroke=null;
+      this.isDrawing=false;
+    };
+  }
+
+  toggleDraw(){
+    this.drawingEnabled=!this.drawingEnabled;
+    this.annotationCanvas.style.pointerEvents=this.drawingEnabled?'auto':'none';
+    document.getElementById('drawToggle').textContent=this.drawingEnabled?'❌ Ferma Disegno':'✏️ Disegna';
+  }
+
+  redrawAnnotations(){
+    this.annotationCtx.clearRect(0,0,this.annotationCanvas.width,this.annotationCanvas.height);
+    if(!this.annotations[this.currentPage]) return;
+    this.annotations[this.currentPage].forEach(stroke=>{
+      this.annotationCtx.strokeStyle=stroke.color;
+      this.annotationCtx.lineWidth=stroke.width;
+      this.annotationCtx.lineCap='round';
+      this.annotationCtx.beginPath();
+      const pts=stroke.points;
+      for(let i=1;i<pts.length;i++){
+        this.annotationCtx.moveTo(pts[i-1].x*this.annotationCanvas.width, pts[i-1].y*this.annotationCanvas.height);
+        this.annotationCtx.lineTo(pts[i].x*this.annotationCanvas.width, pts[i].y*this.annotationCanvas.height);
+      }
+      this.annotationCtx.stroke();
+    });
+  }
+
+  loadPageAnnotations(){ this.redrawAnnotations(); }
+  undoAnnotation(){
+    if(this.annotations[this.currentPage] && this.annotations[this.currentPage].length>0){
+      this.annotations[this.currentPage].pop();
+      this.redrawAnnotations();
+    }
+  }
+  clearAnnotations(){
+    if(this.annotations[this.currentPage]) this.annotations[this.currentPage]=[];
+    this.redrawAnnotations();
+  }
+
+  saveAnnotations(){ 
+    localStorage.setItem('pdfAnnotations', JSON.stringify(this.annotations)); 
+    alert('Annotazioni salvate!'); 
+  }
+  loadAnnotations(){ 
+    this.annotations=JSON.parse(localStorage.getItem('pdfAnnotations')||'{}'); 
+    this.redrawAnnotations(); 
+    alert('Annotazioni caricate!'); 
+  }
+
+  prevPage(){ if(this.currentPage>1) this.renderPage(--this.currentPage); }
+  nextPage(){ if(this.currentPage<this.totalPages) this.renderPage(++this.currentPage); }
+  zoomIn(){ this.scale=Math.min(this.scale+0.2,3); this.renderPage(this.currentPage); }
+  zoomOut(){ this.scale=Math.max(this.scale-0.2,0.5); this.renderPage(this.currentPage); }
+  async fitWidth(){ 
+    const container=document.getElementById('pdfContainer'); 
+    if(!this.pdfDoc) return; 
+    const page=await this.pdfDoc.getPage(this.currentPage); 
+    const viewport=page.getViewport({scale:1}); 
+    this.scale=(container.clientWidth-20)/viewport.width; 
+    this.renderPage(this.currentPage); 
+  }
+
+  closePDF(){
+    this.pdfDoc=null;
+    this.currentPage=1;
+    this.totalPages=0;
+    this.annotations={};
+    this.scale=1.2;
+    this.drawingEnabled=false;
+    this.isDrawing=false;
+    const container=document.getElementById('pdfContainer');
+    container.innerHTML='<p class="text-gray-500">Carica un PDF per iniziare</p>';
+    document.getElementById('currentPage').textContent='1';
+    document.getElementById('totalPages').textContent='1';
+    document.getElementById('zoomLevel').textContent='100%';
+    document.getElementById('drawToggle').textContent='✏️ Disegna';
+    document.getElementById('pdfFile').value='';
+  }
+}
+
+const app=new PDFAnnotator();
+</script>
+
+</body>
+</html>
