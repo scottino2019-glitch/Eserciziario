@@ -1,253 +1,627 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDF Annotator Vettoriale - Undo Funziona</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-body {margin:0; font-family:sans-serif; background:#f0f4f8; display:flex; flex-direction:column; height:100vh;}
-.controls {display:flex; flex-wrap:wrap; gap:5px; justify-content:center; padding:5px; background:#ffffff; z-index:100;}
-button, input[type=color], input[type=range]{padding:5px 10px; border-radius:5px; border:none; font-size:14px;}
-#pdfContainer {position:relative; flex:1; overflow:auto; background:#e2e8f0; display:flex; justify-content:center; align-items:flex-start;}
-.pdf-canvas {border-radius:8px; display:block;}
-.annotation-canvas {position:absolute; left:0; top:0; touch-action:none;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Annotator - Scrivi a Mano</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100%;
+        }
+        
+        html {
+            height: 100%;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100%;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 2rem;
+        }
+
+        .header p {
+            margin: 0;
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .upload-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .file-input-wrapper:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .file-input-wrapper input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .toolbar {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            display: none;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toolbar.visible {
+            display: flex;
+        }
+
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 10px;
+        }
+
+        .tool-group label {
+            font-weight: 600;
+            color: #333;
+            margin-right: 5px;
+        }
+
+        .color-picker {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .color-picker:hover {
+            transform: scale(1.1);
+        }
+
+        .brush-size {
+            width: 120px;
+            height: 8px;
+            border-radius: 4px;
+            background: #ddd;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .action-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+
+        .action-btn.danger {
+            background: #dc3545;
+        }
+
+        .action-btn.danger:hover {
+            background: #c82333;
+        }
+
+        .action-btn.active {
+            background: #007bff;
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+        }
+
+        .action-btn.active:hover {
+            background: #0056b3;
+        }
+
+        .pdf-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            display: none;
+            text-align: center;
+        }
+
+        .pdf-container.visible {
+            display: block;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 20px 0;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #pdfCanvas, #drawingCanvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        #drawingCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: default;
+        }
+
+        #drawingCanvas.drawing-mode {
+            cursor: crosshair;
+        }
+
+        .page-controls {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .page-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .page-btn:hover {
+            background: #5a6fd8;
+        }
+
+        .page-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            font-weight: 600;
+            color: #333;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .toolbar {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .tool-group {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <header class="header">
+            <h1>📝 PDF Annotator</h1>
+            <p>Carica un PDF e scrivi a mano con diversi colori e pennelli</p>
+        </header>
 
-<div class="controls">
-  <input type="file" id="pdfFile" accept=".pdf">
-  <button id="prevPage">← Prec</button>
-  <span id="currentPage">1</span>/<span id="totalPages">1</span>
-  <button id="nextPage">Succ →</button>
-  <button id="zoomOut">🔍-</button>
-  <span id="zoomLevel">100%</span>
-  <button id="zoomIn">🔍+</button>
-  <button id="fitWidth">📐 Fit</button>
-  <button id="drawToggle">✏️ Disegna</button>
-  <input type="color" id="penColor" value="#ff0000">
-  <input type="range" id="penWidth" min="1" max="10" value="2">
-  <button id="clearAnnotations">🗑️ Cancella Tutte</button>
-  <button id="undoAnnotation">↶ Annulla Ultima</button>
-  <button id="saveAnnotations">💾 Salva</button>
-  <button id="loadAnnotations">📂 Carica</button>
-  <button id="closePDF">❌ Chiudi PDF</button>
-</div>
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="pdfFile" accept=".pdf">
+                📄 Seleziona PDF
+            </div>
+            <p style="margin-top: 15px; color: #666;">Supporta file PDF fino a 10MB</p>
+        </div>
 
-<div id="pdfContainer">
-  <p class="text-gray-500">Carica un PDF per iniziare</p>
-</div>
+        <div class="toolbar" id="toolbar">
+            <div class="tool-group">
+                <label for="colorPicker">Colore:</label>
+                <input type="color" id="colorPicker" class="color-picker" value="#000000">
+            </div>
+            
+            <div class="tool-group">
+                <label for="brushSize">Spessore:</label>
+                <input type="range" id="brushSize" class="brush-size" min="1" max="20" value="3">
+                <span id="brushSizeValue">3px</span>
+            </div>
+            
+            <div class="tool-group">
+                <button class="action-btn" id="drawModeBtn">✏️ Modalità Disegno</button>
+                <button class="action-btn" id="undoBtn">↶ Annulla ultimo</button>
+            </div>
+            
+            <div class="tool-group">
+                <button class="action-btn danger" id="clearBtn">🗑️ Cancella tutto</button>
+                <button class="action-btn" id="downloadBtn">💾 Scarica PDF</button>
+            </div>
+        </div>
 
-<script>
-class PDFAnnotator {
-  constructor(){
-    this.pdfDoc=null;
-    this.currentPage=1;
-    this.totalPages=0;
-    this.scale=1.2;
-    this.annotations={}; // {pageNum:[{points:[{x,y}], color, width}]}
-    this.drawingEnabled=false;
-    this.isDrawing=false;
-    this.penColor='#ff0000';
-    this.penWidth=2;
-    this.currentStroke=null;
-    this.init();
-  }
+        <div class="pdf-container" id="pdfContainer">
+            <div class="page-controls">
+                <button class="page-btn" id="prevPage">← Precedente</button>
+                <span class="page-info" id="pageInfo">Pagina 1 di 1</span>
+                <button class="page-btn" id="nextPage">Successiva →</button>
+            </div>
+            
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <canvas id="pdfCanvas"></canvas>
+                <canvas id="drawingCanvas"></canvas>
+            </div>
+        </div>
+    </div>
 
-  init(){
-    document.getElementById('pdfFile').addEventListener('change', e=>this.loadPDF(e));
-    document.getElementById('prevPage').addEventListener('click', ()=>this.prevPage());
-    document.getElementById('nextPage').addEventListener('click', ()=>this.nextPage());
-    document.getElementById('zoomIn').addEventListener('click', ()=>this.zoomIn());
-    document.getElementById('zoomOut').addEventListener('click', ()=>this.zoomOut());
-    document.getElementById('fitWidth').addEventListener('click', ()=>this.fitWidth());
-    document.getElementById('clearAnnotations').addEventListener('click', ()=>this.clearAnnotations());
-    document.getElementById('undoAnnotation').addEventListener('click', ()=>this.undoAnnotation());
-    document.getElementById('saveAnnotations').addEventListener('click', ()=>this.saveAnnotations());
-    document.getElementById('loadAnnotations').addEventListener('click', ()=>this.loadAnnotations());
-    document.getElementById('closePDF').addEventListener('click', ()=>this.closePDF());
-    document.getElementById('drawToggle').addEventListener('click', ()=>this.toggleDraw());
-    document.getElementById('penColor').addEventListener('change', e=>this.penColor=e.target.value);
-    document.getElementById('penWidth').addEventListener('change', e=>this.penWidth=parseInt(e.target.value));
-  }
+    <script>
+        // Configurazione PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  async loadPDF(event){
-    const file=event.target.files[0];
-    if(!file) return;
-    const reader=new FileReader();
-    reader.onload=async e=>{
-      const typedArray=new Uint8Array(e.target.result);
-      this.pdfDoc=await pdfjsLib.getDocument(typedArray).promise;
-      this.totalPages=this.pdfDoc.numPages;
-      document.getElementById('totalPages').textContent=this.totalPages;
-      this.currentPage=1;
-      this.renderPage(this.currentPage);
-    };
-    reader.readAsArrayBuffer(file);
-  }
+        class PDFAnnotator {
+            constructor() {
+                this.pdfDoc = null;
+                this.currentPage = 1;
+                this.totalPages = 0;
+                this.isDrawing = false;
+                this.drawingMode = false;
+                this.drawings = new Map(); // Memorizza i disegni per ogni pagina
+                this.strokes = new Map(); // Memorizza i singoli tratti per ogni pagina
+                
+                this.initElements();
+                this.bindEvents();
+            }
 
-  async renderPage(num){
-    if(!this.pdfDoc) return;
-    this.currentPage=num;
+            initElements() {
+                this.pdfFileInput = document.getElementById('pdfFile');
+                this.toolbar = document.getElementById('toolbar');
+                this.pdfContainer = document.getElementById('pdfContainer');
+                this.pdfCanvas = document.getElementById('pdfCanvas');
+                this.drawingCanvas = document.getElementById('drawingCanvas');
+                this.colorPicker = document.getElementById('colorPicker');
+                this.brushSize = document.getElementById('brushSize');
+                this.brushSizeValue = document.getElementById('brushSizeValue');
+                this.drawModeBtn = document.getElementById('drawModeBtn');
+                this.undoBtn = document.getElementById('undoBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.downloadBtn = document.getElementById('downloadBtn');
+                this.prevPageBtn = document.getElementById('prevPage');
+                this.nextPageBtn = document.getElementById('nextPage');
+                this.pageInfo = document.getElementById('pageInfo');
+                
+                this.pdfCtx = this.pdfCanvas.getContext('2d');
+                this.drawCtx = this.drawingCanvas.getContext('2d');
+            }
 
-    const page=await this.pdfDoc.getPage(num);
-    const viewport=page.getViewport({scale:this.scale});
-    const container=document.getElementById('pdfContainer');
-    container.innerHTML='';
+            bindEvents() {
+                this.pdfFileInput.addEventListener('change', (e) => this.loadPDF(e));
+                this.brushSize.addEventListener('input', (e) => this.updateBrushSize(e));
+                this.drawModeBtn.addEventListener('click', () => this.toggleDrawingMode());
+                this.undoBtn.addEventListener('click', () => this.undoLastStroke());
+                this.clearBtn.addEventListener('click', () => this.clearDrawing());
+                this.downloadBtn.addEventListener('click', () => this.downloadPDF());
+                this.prevPageBtn.addEventListener('click', () => this.changePage(-1));
+                this.nextPageBtn.addEventListener('click', () => this.changePage(1));
+                
+                // Eventi di disegno
+                this.drawingCanvas.addEventListener('mousedown', (e) => this.startDrawing(e));
+                this.drawingCanvas.addEventListener('mousemove', (e) => this.draw(e));
+                this.drawingCanvas.addEventListener('mouseup', () => this.stopDrawing());
+                this.drawingCanvas.addEventListener('mouseout', () => this.stopDrawing());
+                
+                // Eventi touch per mobile
+                this.drawingCanvas.addEventListener('touchstart', (e) => this.startDrawing(e));
+                this.drawingCanvas.addEventListener('touchmove', (e) => this.draw(e));
+                this.drawingCanvas.addEventListener('touchend', () => this.stopDrawing());
+            }
 
-    const canvas=document.createElement('canvas');
-    canvas.width=viewport.width;
-    canvas.height=viewport.height;
-    canvas.className='pdf-canvas';
-    const ctx=canvas.getContext('2d');
-    await page.render({canvasContext:ctx, viewport}).promise;
-    container.appendChild(canvas);
+            async loadPDF(event) {
+                const file = event.target.files[0];
+                if (!file) return;
 
-    const aCanvas=document.createElement('canvas');
-    aCanvas.width=viewport.width;
-    aCanvas.height=viewport.height;
-    aCanvas.className='annotation-canvas';
-    container.appendChild(aCanvas);
-    this.annotationCanvas=aCanvas;
-    this.annotationCtx=aCanvas.getContext('2d');
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    this.pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    this.totalPages = this.pdfDoc.numPages;
+                    this.currentPage = 1;
+                    this.drawings.clear();
+                    this.strokes.clear();
+                    this.drawingMode = false;
+                    this.drawModeBtn.classList.remove('active');
+                    this.drawModeBtn.textContent = '✏️ Modalità Disegno';
+                    this.drawingCanvas.classList.remove('drawing-mode');
+                    
+                    await this.renderPage();
+                    this.showInterface();
+                } catch (error) {
+                    alert('Errore nel caricamento del PDF. Assicurati che il file sia valido.');
+                    console.error('Errore PDF:', error);
+                }
+            }
 
-    this.loadPageAnnotations();
-    this.setupDrawing();
+            async renderPage() {
+                const page = await this.pdfDoc.getPage(this.currentPage);
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                // Imposta dimensioni canvas PDF
+                this.pdfCanvas.width = viewport.width;
+                this.pdfCanvas.height = viewport.height;
+                
+                // Imposta dimensioni canvas disegno
+                this.drawingCanvas.width = viewport.width;
+                this.drawingCanvas.height = viewport.height;
+                
+                // Renderizza la pagina PDF
+                await page.render({
+                    canvasContext: this.pdfCtx,
+                    viewport: viewport
+                }).promise;
+                
+                // Ripristina i disegni per questa pagina
+                this.restoreDrawing();
+                this.updatePageInfo();
+            }
 
-    document.getElementById('currentPage').textContent=num;
-    document.getElementById('zoomLevel').textContent=Math.round(this.scale*100)+'%';
-  }
+            showInterface() {
+                this.toolbar.classList.add('visible');
+                this.pdfContainer.classList.add('visible');
+            }
 
-  setupDrawing(){
-    const aCanvas=this.annotationCanvas;
-    aCanvas.style.pointerEvents=this.drawingEnabled?'auto':'none';
+            updateBrushSize(event) {
+                const size = event.target.value;
+                this.brushSizeValue.textContent = size + 'px';
+            }
 
-    aCanvas.onpointerdown=e=>{
-      if(!this.drawingEnabled) return;
-      this.isDrawing=true;
-      const rect=aCanvas.getBoundingClientRect();
-      const x=(e.clientX-rect.left)/aCanvas.width;
-      const y=(e.clientY-rect.top)/aCanvas.height;
-      this.currentStroke={points:[{x,y}], color:this.penColor, width:this.penWidth};
-    };
+            getMousePos(event) {
+                const rect = this.drawingCanvas.getBoundingClientRect();
+                const scaleX = this.drawingCanvas.width / rect.width;
+                const scaleY = this.drawingCanvas.height / rect.height;
+                
+                let clientX, clientY;
+                
+                if (event.touches) {
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    clientX = event.clientX;
+                    clientY = event.clientY;
+                }
+                
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
+                };
+            }
 
-    aCanvas.onpointermove=e=>{
-      if(!this.isDrawing || !this.currentStroke) return;
-      const rect=aCanvas.getBoundingClientRect();
-      const x=(e.clientX-rect.left)/aCanvas.width;
-      const y=(e.clientY-rect.top)/aCanvas.height;
-      const points=this.currentStroke.points;
-      const last=points[points.length-1];
+            startDrawing(event) {
+                if (!this.drawingMode) return;
+                
+                event.preventDefault();
+                this.isDrawing = true;
+                const pos = this.getMousePos(event);
+                
+                // Inizia un nuovo tratto
+                this.currentStroke = {
+                    points: [pos],
+                    color: this.colorPicker.value,
+                    width: this.brushSize.value
+                };
+                
+                this.drawCtx.beginPath();
+                this.drawCtx.moveTo(pos.x, pos.y);
+                this.drawCtx.strokeStyle = this.colorPicker.value;
+                this.drawCtx.lineWidth = this.brushSize.value;
+                this.drawCtx.lineCap = 'round';
+                this.drawCtx.lineJoin = 'round';
+            }
 
-      this.annotationCtx.strokeStyle=this.currentStroke.color;
-      this.annotationCtx.lineWidth=this.currentStroke.width;
-      this.annotationCtx.lineCap='round';
-      this.annotationCtx.beginPath();
-      this.annotationCtx.moveTo(last.x*this.annotationCanvas.width,last.y*this.annotationCanvas.height);
-      this.annotationCtx.lineTo(x*this.annotationCanvas.width,y*this.annotationCanvas.height);
-      this.annotationCtx.stroke();
+            draw(event) {
+                if (!this.isDrawing || !this.drawingMode) return;
+                
+                event.preventDefault();
+                const pos = this.getMousePos(event);
+                
+                // Aggiungi punto al tratto corrente
+                this.currentStroke.points.push(pos);
+                
+                this.drawCtx.lineTo(pos.x, pos.y);
+                this.drawCtx.stroke();
+            }
 
-      points.push({x,y});
-    };
+            stopDrawing() {
+                if (!this.isDrawing) return;
+                this.isDrawing = false;
+                
+                // Salva il tratto completato
+                if (this.currentStroke && this.currentStroke.points.length > 1) {
+                    if (!this.strokes.has(this.currentPage)) {
+                        this.strokes.set(this.currentPage, []);
+                    }
+                    this.strokes.get(this.currentPage).push(this.currentStroke);
+                }
+                
+                this.saveDrawing();
+            }
 
-    aCanvas.onpointerup=e=>{
-      if(!this.isDrawing || !this.currentStroke) return;
-      if(!this.annotations[this.currentPage]) this.annotations[this.currentPage]=[];
-      this.annotations[this.currentPage].push(this.currentStroke);
-      this.currentStroke=null;
-      this.isDrawing=false;
-    };
+            saveDrawing() {
+                const imageData = this.drawCtx.getImageData(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+                this.drawings.set(this.currentPage, imageData);
+            }
 
-    aCanvas.onpointerleave=e=>{
-      if(this.isDrawing && this.currentStroke){
-        if(!this.annotations[this.currentPage]) this.annotations[this.currentPage]=[];
-        this.annotations[this.currentPage].push(this.currentStroke);
-      }
-      this.currentStroke=null;
-      this.isDrawing=false;
-    };
-  }
+            restoreDrawing() {
+                this.drawCtx.clearRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+                
+                // Ripristina usando i tratti salvati per una migliore qualità
+                if (this.strokes.has(this.currentPage)) {
+                    this.redrawStrokes();
+                } else if (this.drawings.has(this.currentPage)) {
+                    const imageData = this.drawings.get(this.currentPage);
+                    this.drawCtx.putImageData(imageData, 0, 0);
+                }
+            }
 
-  toggleDraw(){
-    this.drawingEnabled=!this.drawingEnabled;
-    this.annotationCanvas.style.pointerEvents=this.drawingEnabled?'auto':'none';
-    document.getElementById('drawToggle').textContent=this.drawingEnabled?'❌ Ferma Disegno':'✏️ Disegna';
-  }
+            toggleDrawingMode() {
+                this.drawingMode = !this.drawingMode;
+                
+                if (this.drawingMode) {
+                    this.drawModeBtn.classList.add('active');
+                    this.drawModeBtn.textContent = '🖱️ Modalità Navigazione';
+                    this.drawingCanvas.classList.add('drawing-mode');
+                } else {
+                    this.drawModeBtn.classList.remove('active');
+                    this.drawModeBtn.textContent = '✏️ Modalità Disegno';
+                    this.drawingCanvas.classList.remove('drawing-mode');
+                }
+            }
 
-  redrawAnnotations(){
-    this.annotationCtx.clearRect(0,0,this.annotationCanvas.width,this.annotationCanvas.height);
-    if(!this.annotations[this.currentPage]) return;
-    this.annotations[this.currentPage].forEach(stroke=>{
-      this.annotationCtx.strokeStyle=stroke.color;
-      this.annotationCtx.lineWidth=stroke.width;
-      this.annotationCtx.lineCap='round';
-      this.annotationCtx.beginPath();
-      const pts=stroke.points;
-      for(let i=1;i<pts.length;i++){
-        this.annotationCtx.moveTo(pts[i-1].x*this.annotationCanvas.width, pts[i-1].y*this.annotationCanvas.height);
-        this.annotationCtx.lineTo(pts[i].x*this.annotationCanvas.width, pts[i].y*this.annotationCanvas.height);
-      }
-      this.annotationCtx.stroke();
-    });
-  }
+            undoLastStroke() {
+                if (!this.strokes.has(this.currentPage)) return;
+                
+                const pageStrokes = this.strokes.get(this.currentPage);
+                if (pageStrokes.length === 0) return;
+                
+                // Rimuovi l'ultimo tratto
+                pageStrokes.pop();
+                
+                // Ridisegna tutti i tratti rimanenti
+                this.redrawStrokes();
+                this.saveDrawing();
+            }
 
-  loadPageAnnotations(){ this.redrawAnnotations(); }
-  undoAnnotation(){
-    if(this.annotations[this.currentPage] && this.annotations[this.currentPage].length>0){
-      this.annotations[this.currentPage].pop();
-      this.redrawAnnotations();
-    }
-  }
-  clearAnnotations(){
-    if(this.annotations[this.currentPage]) this.annotations[this.currentPage]=[];
-    this.redrawAnnotations();
-  }
+            redrawStrokes() {
+                this.drawCtx.clearRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+                
+                if (!this.strokes.has(this.currentPage)) return;
+                
+                const pageStrokes = this.strokes.get(this.currentPage);
+                pageStrokes.forEach(stroke => {
+                    if (stroke.points.length < 2) return;
+                    
+                    this.drawCtx.beginPath();
+                    this.drawCtx.strokeStyle = stroke.color;
+                    this.drawCtx.lineWidth = stroke.width;
+                    this.drawCtx.lineCap = 'round';
+                    this.drawCtx.lineJoin = 'round';
+                    
+                    this.drawCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                    for (let i = 1; i < stroke.points.length; i++) {
+                        this.drawCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                    }
+                    this.drawCtx.stroke();
+                });
+            }
 
-  saveAnnotations(){ 
-    localStorage.setItem('pdfAnnotations', JSON.stringify(this.annotations)); 
-    alert('Annotazioni salvate!'); 
-  }
-  loadAnnotations(){ 
-    this.annotations=JSON.parse(localStorage.getItem('pdfAnnotations')||'{}'); 
-    this.redrawAnnotations(); 
-    alert('Annotazioni caricate!'); 
-  }
+            clearDrawing() {
+                this.drawCtx.clearRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+                this.drawings.delete(this.currentPage);
+                this.strokes.delete(this.currentPage);
+            }
 
-  prevPage(){ if(this.currentPage>1) this.renderPage(--this.currentPage); }
-  nextPage(){ if(this.currentPage<this.totalPages) this.renderPage(++this.currentPage); }
-  zoomIn(){ this.scale=Math.min(this.scale+0.2,3); this.renderPage(this.currentPage); }
-  zoomOut(){ this.scale=Math.max(this.scale-0.2,0.5); this.renderPage(this.currentPage); }
-  async fitWidth(){ 
-    const container=document.getElementById('pdfContainer'); 
-    if(!this.pdfDoc) return; 
-    const page=await this.pdfDoc.getPage(this.currentPage); 
-    const viewport=page.getViewport({scale:1}); 
-    this.scale=(container.clientWidth-20)/viewport.width; 
-    this.renderPage(this.currentPage); 
-  }
+            async changePage(direction) {
+                const newPage = this.currentPage + direction;
+                if (newPage < 1 || newPage > this.totalPages) return;
+                
+                this.currentPage = newPage;
+                await this.renderPage();
+            }
 
-  closePDF(){
-    this.pdfDoc=null;
-    this.currentPage=1;
-    this.totalPages=0;
-    this.annotations={};
-    this.scale=1.2;
-    this.drawingEnabled=false;
-    this.isDrawing=false;
-    const container=document.getElementById('pdfContainer');
-    container.innerHTML='<p class="text-gray-500">Carica un PDF per iniziare</p>';
-    document.getElementById('currentPage').textContent='1';
-    document.getElementById('totalPages').textContent='1';
-    document.getElementById('zoomLevel').textContent='100%';
-    document.getElementById('drawToggle').textContent='✏️ Disegna';
-    document.getElementById('pdfFile').value='';
-  }
-}
+            updatePageInfo() {
+                this.pageInfo.textContent = `Pagina ${this.currentPage} di ${this.totalPages}`;
+                this.prevPageBtn.disabled = this.currentPage === 1;
+                this.nextPageBtn.disabled = this.currentPage === this.totalPages;
+            }
 
-const app=new PDFAnnotator();
-</script>
+            async downloadPDF() {
+                // Crea un canvas temporaneo per combinare PDF e disegni
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // Per semplicità, scarica solo la pagina corrente
+                // In una versione completa, si potrebbero combinare tutte le pagine
+                tempCanvas.width = this.pdfCanvas.width;
+                tempCanvas.height = this.pdfCanvas.height;
+                
+                // Disegna il PDF
+                tempCtx.drawImage(this.pdfCanvas, 0, 0);
+                
+                // Disegna le annotazioni
+                if (this.drawings.has(this.currentPage)) {
+                    const imageData = this.drawings.get(this.currentPage);
+                    tempCtx.putImageData(imageData, 0, 0);
+                }
+                
+                // Scarica come immagine
+                tempCanvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `pdf-annotato-pagina-${this.currentPage}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
+            }
+        }
 
-</body>
+        // Inizializza l'applicazione
+        new PDFAnnotator();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99113ee393ecedb7',t:'MTc2MDg4NzA4MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
