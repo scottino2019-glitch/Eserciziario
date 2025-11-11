@@ -379,33 +379,33 @@
                 this.drawingCanvas.addEventListener('touchmove', (e) => this.draw(e));
                 this.drawingCanvas.addEventListener('touchend', () => this.stopDrawing());
             }
-            // per pdf precaricati
-            // per pdf pre caricati
-        const preloadedSelect = document.getElementById('preloadedPdfSelect');
+      // Event listener per PDF precaricati
+    const preloadedSelect = document.getElementById('preloadedPdfSelect');
+    preloadedSelect.addEventListener('change', async (event) => {
+      const pdfPath = event.target.value;
+      if (!pdfPath) return;
 
-preloadedSelect.addEventListener('change', async (event) => {
-  const pdfPath = event.target.value;
-  if (!pdfPath) return; // Nessun pdf selezionato
-
-  try {
-    // Carica il PDF direttamente da URL o path locale
-    const loadingTask = pdfjsLib.getDocument(pdfPath);
-    this.pdfDoc = await loadingTask.promise;
-    this.totalPages = this.pdfDoc.numPages;
-    this.currentPage = 1;
-    this.drawings.clear();
-    this.strokes.clear();
-    this.drawingMode = false;
-    this.drawModeBtn.classList.remove('active');
-    this.drawModeBtn.textContent = "Modalità Disegno";
-    this.drawingCanvas.classList.remove('drawing-mode');
-    await this.renderPage();
-    this.showInterface();
-  } catch (error) {
-    alert('Errore nel caricamento del PDF pre-caricato.');
-    console.error('Errore PDF:', error);
-  }
-});
+      try {
+        const loadingTask = pdfjsLib.getDocument(pdfPath);
+        this.pdfDoc = await loadingTask.promise;
+        this.totalPages = this.pdfDoc.numPages;
+        this.currentPage = 1;
+        this.drawings.clear();
+        this.strokes.clear();
+        this.drawingMode = false;
+        this.drawModeBtn.classList.remove('active');
+        this.drawModeBtn.textContent = "✏️ Modalità Disegno";
+        this.drawingCanvas.classList.remove('drawing-mode');
+        await this.renderPage();
+        this.showInterface();
+      } catch (error) {
+        alert('Errore nel caricamento del PDF pre-caricato.');
+        console.error('Errore PDF:', error);
+      }
+    });
+}
+         
+         
 
             async loadPDF(event) {
                 const file = event.target.files[0];
