@@ -264,7 +264,16 @@
             <h1>📝 PDF Annotator</h1>
             <p>Carica un PDF e scrivi a mano con diversi colori e pennelli</p>
         </header>
-
+<div class="preloaded-selection">
+  <label for="preloadedPdfSelect">Scegli un PDF pre-caricato:</label>
+  <select id="preloadedPdfSelect">
+    <option value="">-- Seleziona un PDF --</option>
+    <option value="test.pdf">Esercizio 1</option>
+    <option value="pdf2.pdf">Esercizio 2</option>
+    <option value="pdf3.pdf">Esercizio 3</option>
+  </select>
+</div>
+   <br><br>
         <div class="upload-section">
             <div class="file-input-wrapper">
                 <input type="file" id="pdfFile" accept=".pdf">
@@ -370,6 +379,33 @@
                 this.drawingCanvas.addEventListener('touchmove', (e) => this.draw(e));
                 this.drawingCanvas.addEventListener('touchend', () => this.stopDrawing());
             }
+            // per pdf precaricati
+            // per pdf pre caricati
+        const preloadedSelect = document.getElementById('preloadedPdfSelect');
+
+preloadedSelect.addEventListener('change', async (event) => {
+  const pdfPath = event.target.value;
+  if (!pdfPath) return; // Nessun pdf selezionato
+
+  try {
+    // Carica il PDF direttamente da URL o path locale
+    const loadingTask = pdfjsLib.getDocument(pdfPath);
+    this.pdfDoc = await loadingTask.promise;
+    this.totalPages = this.pdfDoc.numPages;
+    this.currentPage = 1;
+    this.drawings.clear();
+    this.strokes.clear();
+    this.drawingMode = false;
+    this.drawModeBtn.classList.remove('active');
+    this.drawModeBtn.textContent = "Modalità Disegno";
+    this.drawingCanvas.classList.remove('drawing-mode');
+    await this.renderPage();
+    this.showInterface();
+  } catch (error) {
+    alert('Errore nel caricamento del PDF pre-caricato.');
+    console.error('Errore PDF:', error);
+  }
+});
 
             async loadPDF(event) {
                 const file = event.target.files[0];
