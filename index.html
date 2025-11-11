@@ -313,9 +313,9 @@
                     this.currentPage = 1;
                     this.drawings.clear();
                     this.strokes.clear();
-                    this.drawingMode = false;
+                    this.drawingMode = true;
                     this.drawModeBtn.classList.remove('active');
-                    this.drawModeBtn.textContent = '✏️ Modalità Disegno';
+                    this.drawModeBtn.textContent = '🖱️ Modalità Navigazione';
                     this.drawingCanvas.classList.remove('drawing-mode');
                     await this.renderPage();
                     this.showInterface();
