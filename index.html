@@ -320,9 +320,9 @@ class PDFAnnotator {
       this.drawings.clear();
       this.strokes.clear();
 
-      this.drawingMode = true;
+      this.drawingMode = false;
       this.drawModeBtn.classList.remove('active');
-      this.drawModeBtn.textContent = '🖱️ Modalità Navigazione';
+      this.drawModeBtn.textContent = '✏️ Modalità Disegno';
       this.drawingCanvas.classList.remove('drawing-mode');
 
       await this.renderPage();
