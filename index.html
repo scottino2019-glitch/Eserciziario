@@ -381,6 +381,17 @@
                 this.restoreDrawing();
                 this.updatePageInfo();
             }
+             // Sincronizza lo stato modalità disegno con la classe CSS
+    if (this.drawingMode) {
+        this.drawingCanvas.classList.add('drawing-mode');
+        this.drawModeBtn.classList.add('active');
+        this.drawModeBtn.textContent = '🖱️ Modalità Navigazione';
+    } else {
+        this.drawingCanvas.classList.remove('drawing-mode');
+        this.drawModeBtn.classList.remove('active');
+        this.drawModeBtn.textContent = '✏️ Modalità Disegno';
+    }
+}
 
             showInterface() {
                 this.toolbar.classList.add('visible');
