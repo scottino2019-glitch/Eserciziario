@@ -276,6 +276,13 @@
             }
 
             bindEvents() {
+                // Listener per file caricati
+    this.pdfFileInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const arrayBuffer = await file.arrayBuffer();
+        this.loadPDFFile(arrayBuffer);
+    });
                 this.pdfFileInput.addEventListener('change', (e) => this.loadPDF(e));
                 this.brushSize.addEventListener('input', (e) => this.updateBrushSize(e));
                 this.drawModeBtn.addEventListener('click', () => this.toggleDrawingMode());
@@ -300,30 +307,37 @@
                     preloadedSelect.addEventListener('change', (event) => {
                         const pdfPath = event.target.value;
                         if (!pdfPath) return;
-                        this.loadPreloadedPDF(pdfPath);
+                        this.loadPDFFile(pdfPath);
                     });
                 }
             }
 
-            async loadPreloadedPDF(pdfPath) {
-                try {
-                    const loadingTask = pdfjsLib.getDocument(pdfPath);
-                    this.pdfDoc = await loadingTask.promise;
-                    this.totalPages = this.pdfDoc.numPages;
-                    this.currentPage = 1;
-                    this.drawings.clear();
-                    this.strokes.clear();
-                    this.drawingMode = true;
-                    this.drawModeBtn.classList.remove('active');
-                    this.drawModeBtn.textContent = '🖱️ Modalità Navigazione';
-                    this.drawingCanvas.classList.remove('drawing-mode');
-                    await this.renderPage();
-                    this.showInterface();
-                } catch (error) {
-                    alert('Errore nel caricamento del PDF pre-caricato.');
-                    console.error('Errore PDF:', error);
-                }
-            }
+            async loadPDFFile(data) {
+    try {
+        let loadingTask;
+        if (typeof data === 'string') {
+            loadingTask = pdfjsLib.getDocument(data);
+        } else {
+            loadingTask = pdfjsLib.getDocument(data);
+        }
+        this.pdfDoc = await loadingTask.promise;
+        this.totalPages = this.pdfDoc.numPages;
+        this.currentPage = 1;
+        this.drawings.clear();
+        this.strokes.clear();
+               // Modalità disegno attiva automaticamente dopo caricamento
+        this.drawingMode = true;
+        this.drawModeBtn.classList.add('active');
+        this.drawModeBtn.textContent = '🖱️ Modalità Navigazione';
+        this.drawingCanvas.classList.add('drawing-mode');
+
+        await this.renderPage();
+        this.showInterface();
+    } catch (error) {
+        alert('Errore nel caricamento del PDF.');
+        console.error('Errore PDF:', error);
+    }
+}
 
             async loadPDF(event) {
                 const file = event.target.files[0];
@@ -336,9 +350,9 @@
                     this.currentPage = 1;
                     this.drawings.clear();
                     this.strokes.clear();
-                    this.drawingMode = false;
+                    this.drawingMode = true;
                     this.drawModeBtn.classList.remove('active');
-                    this.drawModeBtn.textContent = '✏️ Modalità Disegno';
+                    this.drawModeBtn.textContent = '🖱️ Modalità Navigazione';
                     this.drawingCanvas.classList.remove('drawing-mode');
 
                     await this.renderPage();
