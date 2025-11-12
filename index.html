@@ -295,6 +295,10 @@
      📄 PDF Annotator
     </div>
     <div class="toolbar-group"><input type="file" id="fileInput" accept="application/pdf"> <button class="btn btn-primary" id="uploadBtn">📁 Carica PDF</button> <button class="btn btn-success" id="sampleBtn">📄 Esempio</button>
+ <button class="btn btn-success" id="btnHindi">Hindi</button>
+  <button class="btn btn-success" id="btnChinese">Chinese</button>
+  <button class="btn btn-success" id="btnJapanese">Japanese</button>
+
     </div>
     <div class="toolbar-group" id="pageNav" style="display: none;">
      <div class="page-nav"><button id="prevBtn">◀ Prec</button>
@@ -374,9 +378,14 @@
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
 
+document.getElementById('btnHindi').addEventListener('click', () => loadPDF('pdf/hindi.pdf'));
+document.getElementById('btnChinese').addEventListener('click', () => loadPDF('pdf/chinese.pdf'));
+document.getElementById('btnJapanese').addEventListener('click', () => loadPDF('pdf/japanese.pdf'));
+
     uploadBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileSelect);
     sampleBtn.addEventListener('click', loadSamplePDF);
+
 
     drawBtn.addEventListener('click', () => setTool('draw'));
     textBtn.addEventListener('click', () => setTool('text'));
@@ -440,7 +449,7 @@
       const samplePDF = createSamplePDF();
       loadPDF(samplePDF);
     }
-
+    
     function createSamplePDF() {
       const canvas = document.createElement('canvas');
       canvas.width = 300;
